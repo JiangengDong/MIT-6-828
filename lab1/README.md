@@ -81,6 +81,8 @@ The first thing the kernel does is to enable virtual memory. The reason we need 
 
 (I don't understand why we need to finish this task when these texts are written. Maybe it can familiarize us with the hardware? I hope I can understand it later. Anyway, let's start. )
 
+(After I finish this part, the purpose of such design is clear. It is aimed to teach us how the hardware are abstracted in an operating system. For example, the screen, serial, etc. are stdout, while the keyboard is stdin. )
+
 #### Background knowledge
 
 The first thing I need to figure out is variable arguments. I didn't write too much code in C, so in fact, I don't know this feature until now. It is defined in the file [inc/stdarg.h](../jos/inc/stdarg.h), using the builtin function of GCC. The usage is as follows. 
@@ -129,7 +131,7 @@ char*	readline(const char *prompt);
 
 First, we can ignore the functions `printfmt`, `snprintf`, `cprintf` and `fprintf`. They are wrappers for functions with the same name but prepended with a "v". 
 
-Second, there are only character operations in [console.c](../jos/kern/console.c), so it is for the most low-level operations that related to hardware. 
+Second, there are only character operations in [console.c](../jos/kern/console.c), so it is for the most low-level operations related to hardware. 
 
 After that, let's look at [printfmt.c](../jos/lib/printfmt.c). The `vprintfmt` is the common operation for `vsnprintf` (print to a string buffer), `cprintf` (print to the console), `fprintf` (print to a file). It parses the `fmt`, fills the fields with data in va_list, and writes the result into `putdat` using the function `putch`. Hence there is nothing to say about function `vsnprinf`, for it is only a wrapper. The same is true for [printf.c](../jos/kern/printf.c). 
 
@@ -143,5 +145,55 @@ I cannot find the [fprintf.c](), so I guess it is meant to be written by myself.
 
 ### The stack
 
-Learning... I need knowledge of GCC calling convention to understand this part.
+By the GCC convention, the stack is in fact a "stack of stack frames": each function has a stack frame that contains the local variables. We should pay attention to two registers here: `%ebp` and `%esp`, which points to the bottom and top of the current stack frame.
+```
+        +------------+   |
+        | arg 2      |   \
+        +------------+    >- previous function's stack frame
+        | arg 1      |   /
+        +------------+   |
+        | ret %eip   |   /
+        +============+   
+%ebp->  | saved %ebp |   \
+        +------------+   |
+        |            |   |
+        |   local    |   \
+        | variables, |    >- current function's stack frame
+        |    etc.    |   /
+        |            |   |
+%esp->  |            |   |
+        +------------+   /
+```
+
+Let's take a look at an example. Supposing `func1` calls `func2` and `func2` calls `func3`, the stack will look like follows. 
+
+* (high address)
+* local variables of `func1` (**L1**)
+* last argument of `func2`
+* ...
+* first argument of `func2`
+* return address for `func2` (the next instruction in `func1` after calling `func1`)
+    * stack bottom of `func1` (**L2**)
+    * local variables of `func2`
+    * last argument of `func3`
+    * ...
+    * first argument of `func3`
+    * return address for `func3` (the next instruction in `func2` after calling `func3`)
+        * stack bottom of `func2` (**L3**)
+        * local variables of `func3`
+* (low address)
+
+During the program execution, `esp` moves sequentially, increasing or decreasing 4 at a time, while `ebp` jumps among **L1**, **L2** and **L3**. The movement of `ebp` during the whole process is as follows. 
+
+1. At first, `ebp` points to **L1**. 
+1. Once entering `func2`, `ebp` points to **L2**, whose content is the address of **L1**. 
+1. Once entering `func3`, `ebp` points to **L3**, whose content is the address of **L2**. 
+1. Once exiting `func3`, `ebp` returns to **L2** by reading the content of **L3**.
+1. Once exiting `func2`, `ebp` returns to **L1** by reading the content of **L2**.
+
+To sum up, if we ignore local variables, the stack is designed to recover the instruction and data address of the caller when exiting callee. If we take local variables into consideration, the stack is also designed to abandon them quickly by pointing `esp` to `ebp`.
+
+We all know that the modern computer are based on the Princeton architecture, where the instruction and data are both stored in the same memory space. In practice, however, the instruction and data are stored in different sections in the memory. That's why we need the GCC calling convention: it provides a way to recover both instructions and data.
+
+TODO: write the backtrace function
 
