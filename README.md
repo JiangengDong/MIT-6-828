@@ -12,4 +12,4 @@ To anyone that want to use my docker configuration: If the GUI cannot work, firs
 
 ## Contents
 
-1. [Lab1](./lab1/README.md)
+1. [Lab1](./doc/lab1.md)

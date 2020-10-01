@@ -195,5 +195,35 @@ To sum up, if we ignore local variables, the stack is designed to recover the in
 
 We all know that the modern computer are based on the Princeton architecture, where the instruction and data are both stored in the same memory space. In practice, however, the instruction and data are stored in different sections in the memory. That's why we need the GCC calling convention: it provides a way to recover both instructions and data.
 
-TODO: write the backtrace function
+Some other tips:
 
+1. %eax (and %edx, if return type is 64-bit) contains return value (or trash if function is void).
+1. Various x86 instructions, such as call, are "hard-wired" to use the stack pointer register.
+1. The ebp (base pointer) register, in contrast, is associated with the stack primarily by software convention.
+
+### Backtrace
+
+It is easy after I understand the stack. Several tips: 
+
+1. The initial value of ebp is 0, which indicates where the backtrace should stop.
+
+1. As I mentioned above, there are three program headers at the beginning of the ELF file. It may be confusing if we list the section headers with the command `objdump -h obj/kern/kernel`. There are 7 sections, why? Because the text, rodata, stab and stabstr sections are loaded as a whole. 
+
+    ```
+    Sections:
+    Idx Name          Size      VMA       LMA       File off  Algn
+      0 .text         00001831  f0100000  00100000  00001000  2**4
+                      CONTENTS, ALLOC, LOAD, READONLY, CODE
+      1 .rodata       0000079c  f0101840  00101840  00002840  2**5
+                      CONTENTS, ALLOC, LOAD, READONLY, DATA
+      2 .stab         000038e9  f0101fdc  00101fdc  00002fdc  2**2
+                      CONTENTS, ALLOC, LOAD, READONLY, DATA
+      3 .stabstr      000018fc  f01058c5  001058c5  000068c5  2**0
+                      CONTENTS, ALLOC, LOAD, READONLY, DATA
+      4 .data         0000a300  f0108000  00108000  00009000  2**12
+                      CONTENTS, ALLOC, LOAD, DATA
+      5 .bss          00000648  f0112300  00112300  00013300  2**5
+                      CONTENTS, ALLOC, LOAD, DATA
+      6 .comment      00000035  00000000  00000000  00013948  2**0
+                      CONTENTS, READONLY
+    ```
